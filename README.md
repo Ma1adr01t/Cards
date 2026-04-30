@@ -1,4 +1,4 @@
-# Suburban Spook Co-op Card Game Prototype
+# Cards Playtest
 
 A browser-playable, no-backend prototype for testing a cooperative run-based card game loop.
 
