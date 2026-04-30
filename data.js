@@ -1,4 +1,4 @@
-export const RULES={maxEnemiesOnField:8,evIncreaseOnWin:1,itemUseConsumesAction:false,singleActiveItem:true,replaceActiveItem:true,itemDurationTick:"endRound",lootBudgetFormula:"encounterVal",threePlayerTargetRule:"reroll4"};
+export const RULES={maxEnemiesOnField:8,evIncreaseOnWin:2,itemUseConsumesAction:false,singleActiveItem:true,replaceActiveItem:true,itemDurationTick:"endRound",lootBudgetFormula:"encounterVal",threePlayerTargetRule:"reroll4"};
 export const ITEMS=[
 {name:"Trail Mix",value:1,duration:3,keywords:["Food"],text:"Recover 2 Health/Turn"},
 {name:"Candy Bar",value:1,duration:1,keywords:["Food"],text:"Recover 4 Health"},

@@ -1,4 +1,4 @@
-import { RULES, ITEMS, EQUIPMENT, MEMENTOS, STATUSES, ENEMIES, WARDENS } from './data.js';
+import { RULES, ITEMS, EQUIPMENT, MEMENTOS, STATUSES, ENEMIES } from './data.js';
 
 const gameState = {
   screen: 'start',
