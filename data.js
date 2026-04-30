@@ -18,12 +18,39 @@ export const EQUIPMENT=[{name:"Baseball Bat",value:3,durability:5,type:"Weapon",
 export const MEMENTOS=[{name:"Backpack",badges:0,tap:false,flavor:"A trusty companion",effect:"You have 2 additional inventory slots"},{name:"Lucky Coin",badges:0,tap:true,flavor:"A memento of a better time",effect:"TAP: When your HP would be set to 0, set your HP to 1"},{name:"Magic 9-Ball",badges:0,tap:true,flavor:"A cheap knock-off of a classic",effect:"TAP: Reroll an action an enemy just took"},{name:"Inessential Oils Kit",badges:0,tap:true,flavor:"All you need to get started selling!",effect:"TAP: Choose 1P, that P recovers from 1 status"},{name:"Roller Blades",badges:1,tap:false,flavor:"Speedy and stylish!",effect:"You may always move first in encounters"},{name:"Lighter",badges:1,tap:true,flavor:"A small lighter with plenty of fuel",effect:"TAP: +1 to basic attack, +1 additional against Flammable enemies"},{name:"Charm Bracelet",badges:0,tap:true,flavor:"A little trinket that never leaves your wrist",effect:"TAP: +1 DEF for 3 turns"},{name:"Headphones",badges:0,tap:false,flavor:"Tunes that keep you alert",effect:"Immune to Drowsy"}];
 export const STATUSES=[{name:"CHILLY",duration:5,passive:"",table:["1-2|Frostbite! -1 HP","3-4|Slips: Action Fails","5-6|Shivering!"]},{name:"WET",duration:5,passive:"-1 DEF from Charged; lose Flammable",table:["1-2|Slips: Action Fails","3-6|You're Soaked!"]},{name:"DROWSY",duration:5,passive:"",table:["1-2|Sleepy: -1 to ATK/DEF Action","3-4|Nodded Off: Action fails","5-6|Snapped Back: Remove DROWSY"]},{name:"NAUSEOUS",duration:8,passive:"-1 HP per turn",table:[]},{name:"DIZZY",duration:5,passive:"",table:["1-2|Trouble Focusing: Action Fails","3-4|Off Balance","5-6|Snapped Back: Remove DIZZY"]},{name:"TOASTY",duration:5,passive:"",table:["1-3|Sizzling! -1 HP","4-6|Smoking quietly..."]},{name:"CRACKLY",duration:5,passive:"+1 ATK from Charged",table:["1-3|Overloaded! -1 HP","4-5|Paralyzed! Action Fails","6|Crackling with sparks!"]},{name:"FUZZLED",duration:5,passive:"",table:["1-3|Trouble Focusing: Action Fails","4-5|Trips: -1 HP and Action Fails","6|Snapped Back: Remove FUZZLED"]},{name:"FAR OUT",duration:5,passive:"",table:["1-2|Spaced Out: Action Fails","3-4|Found Yourself! +1 HP","5-6|Snapped Back: Remove FAR OUT"]}];
 export const ENEMIES=[
-{name:"Happy Vamper",setId:"AE1",keywords:["Critter","Flying"],val:2,max:3,hp:6,actions:["1-3|ATK 1P for 2","4|Flaps around doing nothing","5|Curls up, +1 DEF","6|Flies away: RUN"]},
-{name:"Whacky Weed",setId:"AE2",keywords:["Plant","Flammable"],val:3,max:2,hp:10,actions:["1-2|Sunning: +1 ATK (4 LIMIT)","3-4|Seed: ATK ALL for 1","5|Whip: ATK 1P for 2","6|Bloom: HEAL 1"]},
-{name:"Junk Mail",setId:"AE3",keywords:["Object","Flying"],val:3,max:3,hp:4,actions:["1-2|Papercut: ATK 1P for 1","3-4|Campaign: add 1 Junk Mail (3 Max)","5-6|Fold Down: Take no damage from ATKs next player phase"]},
-{name:"Snow Drone",setId:"AE4",keywords:["Cold"],val:2,max:3,hp:8,actions:["1-2|Flurry: ATK ALL for 2","3-4|Snow Warning: +1 ATK (4 LIMIT)","5|Deep Freeze: +1 DEF (2 LIMIT)","6|Melt Away: FLEE"]},
-{name:"Tight Mussel",setId:"AE5",keywords:["Soggy"],val:2,max:5,hp:4,actions:["1-2|ATK 1P for 1","3-4|Flex: +1 ATK (4 LIMIT)","5|Retract: +1 DEF (5 LIMIT)","6|Spray: Give 1P Wet"]},
-{name:"Rave Little Toaster",setId:"AE6",keywords:["Object","Charged","Spicy"],val:4,max:2,hp:10,actions:["1-2|ATK 1P for 2","3-4|Hot Hands! Give 1P Toasty","5|Overcook! Give ALL P Toasty","6|Maintenance: Recover 1HP"]},
-{name:"Dust Rabid",setId:"AE7",keywords:["Critter","Dirty"],val:4,max:3,hp:5,actions:["1-2|ATK 1P for 3","3-4|Foaming: +1 ATK (4 LIMIT)","5|Accumulate: add 1 Dust Rabid (3 Max)","6|Dissipate: Flee"]}
+{name:"Happy Vamper",setId:"AE1",keywords:["Critter","Flying"],val:2,max:3,hp:6,actions:[
+{rolls:[1,2,3],label:"ATK 1P for 2",type:"attackOne",amount:2},
+{rolls:[4],label:"Flaps around doing nothing",type:"none"},
+{rolls:[5],label:"Curls up, +1 DEF",type:"buffSelf",amount:1,stat:"DEF",limit:2},
+{rolls:[6],label:"Flies away: RUN",type:"flee"}]},
+{name:"Whacky Weed",setId:"AE2",keywords:["Plant","Flammable"],val:3,max:2,hp:10,actions:[
+{rolls:[1,2],label:"Sunning: +1 ATK (4 LIMIT)",type:"buffSelf",amount:1,stat:"ATK",limit:4},
+{rolls:[3,4],label:"Seed: ATK ALL for 1",type:"attackAll",amount:1},
+{rolls:[5],label:"Whip: ATK 1P for 2",type:"attackOne",amount:2},
+{rolls:[6],label:"Bloom: HEAL 1",type:"healSelf",amount:1}]},
+{name:"Junk Mail",setId:"AE3",keywords:["Object","Flying"],val:3,max:3,hp:4,actions:[
+{rolls:[1,2],label:"Papercut: ATK 1P for 1",type:"attackOne",amount:1},
+{rolls:[3,4],label:"Campaign: add 1 Junk Mail (3 Max)",type:"spawnSame"},
+{rolls:[5,6],label:"Fold Down: Take no damage from ATKs next player phase",type:"manual"}]},
+{name:"Snow Drone",setId:"AE4",keywords:["Cold"],val:2,max:3,hp:8,actions:[
+{rolls:[1,2],label:"Flurry: ATK ALL for 2",type:"attackAll",amount:2},
+{rolls:[3,4],label:"Snow Warning: +1 ATK (4 LIMIT)",type:"buffSelf",amount:1,stat:"ATK",limit:4},
+{rolls:[5],label:"Deep Freeze: +1 DEF (2 LIMIT)",type:"buffSelf",amount:1,stat:"DEF",limit:2},
+{rolls:[6],label:"Melt Away: FLEE",type:"flee"}]},
+{name:"Tight Mussel",setId:"AE5",keywords:["Soggy"],val:2,max:5,hp:4,actions:[
+{rolls:[1,2],label:"ATK 1P for 1",type:"attackOne",amount:1},
+{rolls:[3,4],label:"Flex: +1 ATK (4 LIMIT)",type:"buffSelf",amount:1,stat:"ATK",limit:4},
+{rolls:[5],label:"Retract: +1 DEF (5 LIMIT)",type:"buffSelf",amount:1,stat:"DEF",limit:5},
+{rolls:[6],label:"Spray: Give 1P Wet",type:"giveStatusOne",status:"WET"}]},
+{name:"Rave Little Toaster",setId:"AE6",keywords:["Object","Charged","Spicy"],val:4,max:2,hp:10,actions:[
+{rolls:[1,2],label:"ATK 1P for 2",type:"attackOne",amount:2},
+{rolls:[3,4],label:"Hot Hands! Give 1P Toasty",type:"giveStatusOne",status:"TOASTY"},
+{rolls:[5],label:"Overcook! Give ALL P Toasty",type:"giveStatusAll",status:"TOASTY"},
+{rolls:[6],label:"Maintenance: Recover 1HP",type:"healSelf",amount:1}]},
+{name:"Dust Rabid",setId:"AE7",keywords:["Critter","Dirty"],val:4,max:3,hp:5,actions:[
+{rolls:[1,2],label:"ATK 1P for 3",type:"attackOne",amount:3},
+{rolls:[3,4],label:"Foaming: +1 ATK (4 LIMIT)",type:"buffSelf",amount:1,stat:"ATK",limit:4},
+{rolls:[5],label:"Accumulate: add 1 Dust Rabid (3 Max)",type:"spawnSame"},
+{rolls:[6],label:"Dissipate: Flee",type:"flee"}]}
 ];
 export const WARDENS=[{name:"Postmaster General",setId:"W1",keywords:["Boss","Object","Authority"],evReq:8,badgeReq:0,val:6,max:1,hp:30,setup:"Spawn 2 Junk Mail immediately.",reward:"1 Badge + bonus loot budget 6",actions:["1|Priority Stamp: +2 ATK (4 LIMIT)","2|Mail Flood: Spawn Junk Mail up to 3 total","3-4|Return to Sender: Deal 3 damage to last attacker","5|Certified Mail: ATK 1P for 4","6|Bureaucracy: Give all players Fuzzled"]}];
