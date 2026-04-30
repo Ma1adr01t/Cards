@@ -1,98 +1,128 @@
 import { RULES, ITEMS, EQUIPMENT, MEMENTOS, STATUSES, ENEMIES } from './data.js';
 
 const gameState = {
-  screen: 'start', players: [], currentEnemies: [], defeatedEnemyValue: 0, currentEV: 3, currentRound: 1,
-  activityLog: [], lootOffers: [], badges: 0, encounterVal: 0, enemyInstanceSeq: 1,
-  encounterStatus: 'No Encounter', encounterHadEnemies: false, encounterWon: false,
-  lootDrawnForEncounter: false, evAdvancedForEncounter: false, autoEnemyPhaseAfterPlayerActions: true,
-  isTypingLog: false, logQueue: [], typeSpeedMs: 16,
+  screen: 'start',
+  players: [],
+  currentEnemies: [],
+  defeatedEnemyValue: 0,
+  currentEV: 3,
+  currentRound: 1,
+  activityLog: [],
+  lootOffers: [],
+  badges: 0,
+  encounterVal: 0,
+  enemyInstanceSeq: 1,
 };
 
 const app = document.getElementById('app');
-const r=(n=6)=>Math.floor(Math.random()*n)+1;
-const randomOf=(arr)=>arr[Math.floor(Math.random()*arr.length)];
-const sumStatus=(statuses,key)=>statuses.reduce((a,s)=>a+(s[key]||0),0);
-const EV_WIN_BONUS = RULES.evIncreaseOnWin ?? 2;
+const r = (n = 6) => Math.floor(Math.random() * n) + 1;
+const randomOf = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const sumStatus = (statuses, key) => statuses.reduce((acc, st) => acc + (st[key] || 0), 0);
 
-function enqueueLog(message){ gameState.logQueue.push(message); if(!gameState.isTypingLog) processLogQueue(); }
-function flushLogs(){ while(gameState.logQueue.length){ gameState.activityLog.unshift(`[${new Date().toLocaleTimeString()}] ${gameState.logQueue.shift()}`);} gameState.isTypingLog=false; render(); scrollLogToBottom(); }
-function processLogQueue(){ const msg=gameState.logQueue.shift(); if(!msg){ gameState.isTypingLog=false; return; } gameState.isTypingLog=true; let i=0; const ts=`[${new Date().toLocaleTimeString()}] `; const lineObj={text:ts}; gameState.activityLog.unshift(lineObj.text); render(); const tick=()=>{ i+=2; lineObj.text=ts+msg.slice(0,i); gameState.activityLog[0]=lineObj.text; render(); scrollLogToBottom(); if(i<msg.length) setTimeout(tick, gameState.typeSpeedMs); else setTimeout(processLogQueue, 110); }; tick(); }
-function scrollLogToBottom(){ const el=document.getElementById('battleLog'); if(el) el.scrollTop=0; }
+const log = (m) => {
+  gameState.activityLog.unshift(`[${new Date().toLocaleTimeString()}] ${m}`);
+  render();
+};
 
-function render(){ app.innerHTML=gameState.screen==='start'?start():gameState.screen==='run'?run():browser(); bind(); }
-function start(){ return `<section class='panel'><h2>Start Run</h2><label>Players <select id='pc'>${[1,2,3,4].map((n)=>`<option>${n}</option>`).join('')}</select></label><div id='mem'></div><button id='go'>Start Run</button><button id='browse'>Card Browser</button></section>`; }
-function initPlayers(n){ gameState.players=[...Array(n)].map((_,i)=>({id:i+1,name:`Player ${i+1}`,maxHp:20,hp:20,atk:1,def:1,run:1,selectedMemento:MEMENTOS[0].name,inventory:[],selectedInventoryIndex:0,activeItem:null,equipment:[],statuses:[],defending:false,acted:false,selectedTargetId:null,lastHit:false})); }
-
-function run(){
-  const enemyArea = `<section class='panel enemy-zone ${gameState.shake ? 'shake':''}' id='battleArea'><div class='zone-header'><h3>Enemy Area (${gameState.currentEnemies.length}/${RULES.maxEnemiesOnField})</h3><span>${gameState.encounterStatus}</span></div>${gameState.lootOffers.length>0 && gameState.encounterWon ? lootOverlay() : `<div class='card-grid top-grid'>${gameState.currentEnemies.map((e,i)=>enemyCard(e,i)).join('') || '<p>No enemies on field.</p>'}</div>`}</section>`;
-  return `<div class='battle-layout'>
-  <section class='panel controls'><h3>Run Controls</h3><div class='statline'>Round <b>${gameState.currentRound}</b></div><div class='statline'>EV: ${gameState.currentEV} <button data-a='ev+'>+</button><button data-a='ev-'>-</button></div><div class='statline'>Status: <b>${gameState.encounterStatus}</b></div><label><input type='checkbox' id='autoEnemyToggle' ${gameState.autoEnemyPhaseAfterPlayerActions?'checked':''}/> Auto Enemy Phase After Player Actions</label><label><input type='checkbox' id='fastLog'/> Fast Log</label><div class='button-row'><button data-a='enc'>Generate Encounter</button><button data-a='endPlayer'>End Player Phase</button><button data-a='enemy'>Enemy Phase</button><button data-a='end'>End Round</button><button data-a='resetActs'>Reset Actions</button></div><div class='button-row'><button data-a='loot'>Draw Loot (Debug)</button><button data-a='clear'>Clear Encounter</button><button data-a='flush'>Skip/Flush Log</button><button data-a='reset'>Reset</button></div></section>
-  ${enemyArea}
-  <section class='panel player-zone'><h3>Players</h3><div class='card-grid player-grid'>${gameState.players.map((p,i)=>playerCard(p,i)).join('')}</div></section>
-  <section class='panel log-zone'><h3>Activity Log</h3><div id='battleLog' class='log-feed'>${gameState.activityLog.slice(0,150).join('<br>')}</div></section>
-</div>`;
+function render() {
+  app.innerHTML = gameState.screen === 'start' ? start() : gameState.screen === 'run' ? run() : browser();
+  bind();
 }
 
-function lootOverlay(){ return `<div class='loot-overlay'><h4>Battle Rewards</h4><div class='card-grid compact'>${gameState.lootOffers.map((l,i)=>lootCard(l,i)).join('') || '<p>No loot.</p>'}</div><button data-a='closeLoot'>Close Rewards</button></div>`; }
-function enemyCard(e,i){ return `<article class='proto-card enemy ${e.lastHit?'hit':''}'><header><b>${e.name}</b><span>${e.baseCardId}</span></header><div class='meta'>KW: ${(e.keywords||[]).join(', ')} | VAL ${e.value} | MAX ${e.max}</div><div class='bar'>HP ${e.hp}/${e.maxHp} <button data-k='ehp+' data-i='${i}'>+HP</button><button data-k='ehp-' data-i='${i}'>-HP</button><button data-k='rmEnemy' data-i='${i}'>Remove</button></div><div class='meta'>Temp: +ATK ${e.tempAtkBonus} | +DEF ${e.tempDefBonus}</div><div class='actions'>${e.actions.map((a)=>`<div class='action-row'><span>${a.rolls.join(',')}</span><span>${a.label}</span></div>`).join('')}</div></article>`; }
-function playerCard(p,i){ const invOpts=p.inventory.map((it,idx)=>`<option value='${idx}' ${idx===p.selectedInventoryIndex?'selected':''}>${it.name}</option>`).join(''); const active=p.activeItem?`${p.activeItem.name} (${p.activeItem.remaining})`:'None'; return `<article class='proto-card player ${p.lastHit?'hit':''}'><header><b>${p.name}</b><span>${p.defending?'DEFENDING':'READY'} | ${p.acted?'ACTED':'NOT ACTED'}</span></header><div class='bar'>HP ${p.hp}/${p.maxHp} <button data-k='php+' data-i='${i}'>+HP</button><button data-k='php-' data-i='${i}'>-HP</button></div><div class='meta'>ATK ${p.atk} | DEF ${p.def} | RUN ${p.run}</div><div class='meta'>Active Item: ${active}</div><div class='meta'>Inventory: <select data-k='selItem' data-i='${i}'>${invOpts || `<option value=''>Empty</option>`}</select> <button data-k='useItem' data-i='${i}'>Use Item</button></div><div class='meta'>Equip: ${p.equipment.map((e)=>`${e.name}(${e.durability})`).join(', ') || 'None'} <button data-k='addEq' data-i='${i}'>+Equip</button></div><div class='meta'>Statuses: ${p.statuses.map((s)=>`${s.name}(${s.remaining})`).join(', ') || 'None'} <button data-k='addSt' data-i='${i}'>+Status</button><button data-k='rmSt' data-i='${i}'>-Status</button></div><div class='meta'>Target: <select data-k='target' data-i='${i}'>${gameState.currentEnemies.map((e)=>`<option value='${e.instanceId}' ${e.instanceId===p.selectedTargetId?'selected':''}>${e.name}#${e.instanceId}</option>`).join('')}</select></div><div class='button-row'><button data-k='atk' data-i='${i}'>Attack</button><button data-k='def' data-i='${i}'>Defend</button><button data-k='run' data-i='${i}'>Run</button><button data-k='addInv' data-i='${i}'>+Item</button></div></article>`; }
-function lootCard(l,i){ return `<article class='proto-card loot'><header><b>${l.name}</b><span>VAL ${l.value||1}</span></header><div class='meta'>${l.type||'Item'} | ${l.text||''}</div><div class='meta'>Assign: <select data-k='lootTarget' data-i='${i}'>${gameState.players.map((p,idx)=>`<option value='${idx}'>${p.name}</option>`).join('')}</select> <button data-k='assignLoot' data-i='${i}'>Give</button> <button data-k='discardLoot' data-i='${i}'>Discard</button></div></article>`; }
-function browser(){ return `<button id='back'>Back</button><section class='panel'><h3>Enemies</h3><div class='card-grid'>${ENEMIES.map((x)=>`<article class='proto-card enemy'><header><b>${x.name}</b><span>${x.setId}</span></header><div class='meta'>VAL ${x.val} | MAX ${x.max}</div></article>`).join('')}</div></section>`; }
+function start() { return `<section class='panel'><h2>Start Run</h2><label>Players <select id='pc'>${[1,2,3,4].map((n)=>`<option>${n}</option>`).join('')}</select></label><div id='mem'></div><button id='go'>Start Run</button><button id='browse'>Card Browser</button></section>`; }
 
-function bind(){ if(gameState.screen==='start'){ const pc=document.getElementById('pc'), mem=document.getElementById('mem'); const paint=()=>{ mem.innerHTML=[...Array(Number(pc.value))].map((_,i)=>`P${i+1}:<select id='m${i}'>${MEMENTOS.map((m)=>`<option>${m.name}</option>`).join('')}</select><br>`).join('');}; pc.onchange=paint; paint(); document.getElementById('go').onclick=()=>{ initPlayers(Number(pc.value)); gameState.players.forEach((p,i)=>p.selectedMemento=document.getElementById(`m${i}`).value); gameState.screen='run'; enqueueLog('Run started.'); }; document.getElementById('browse').onclick=()=>{gameState.screen='browser'; render();}; return; }
-if(gameState.screen==='browser'){ document.getElementById('back').onclick=()=>{gameState.screen='start'; render();}; return; }
-app.querySelectorAll('button[data-a]').forEach((b)=>b.onclick=()=>actions(b.dataset.a)); app.querySelectorAll('button[data-k]').forEach((b)=>b.onclick=()=>playerAction(b.dataset.k,Number(b.dataset.i))); app.querySelectorAll("select[data-k='target']").forEach((s)=>s.onchange=()=>gameState.players[Number(s.dataset.i)].selectedTargetId=Number(s.value)); app.querySelectorAll("select[data-k='selItem']").forEach((s)=>s.onchange=()=>gameState.players[Number(s.dataset.i)].selectedInventoryIndex=Number(s.value)); app.querySelectorAll("select[data-k='lootTarget']").forEach((s)=>s.onchange=()=>gameState.lootOffers[Number(s.dataset.i)].selectedPlayerIndex=Number(s.value)); document.getElementById('autoEnemyToggle').onchange=(e)=>gameState.autoEnemyPhaseAfterPlayerActions=e.target.checked; document.getElementById('fastLog').onchange=(e)=>gameState.typeSpeedMs=e.target.checked?1:16; }
-
-function actions(a){ if(a==='enc')generateEncounter(); if(a==='enemy')enemyPhase(); if(a==='end')endRound(); if(a==='endPlayer')resolveEnemyThenEndRound(); if(a==='loot')drawLoot(false,true); if(a==='clear'){clearEncounter(); enqueueLog('Encounter cleared.');} if(a==='resetActs'){gameState.players.forEach((p)=>p.acted=false); enqueueLog('Player actions reset.');} if(a==='closeLoot'){gameState.lootOffers=[]; if(gameState.encounterWon) gameState.encounterStatus='Ready for Next Encounter';} if(a==='flush')flushLogs(); if(a==='reset')location.reload(); if(a==='ev+')gameState.currentEV++; if(a==='ev-')gameState.currentEV=Math.max(1,gameState.currentEV-1); render(); }
-
-function clearEncounter(){ gameState.currentEnemies=[]; gameState.encounterVal=0; gameState.defeatedEnemyValue=0; gameState.encounterHadEnemies=false; gameState.encounterWon=false; gameState.lootDrawnForEncounter=false; gameState.evAdvancedForEncounter=false; gameState.encounterStatus='No Encounter'; }
-function createEnemyInstance(card){ return {instanceId:gameState.enemyInstanceSeq++,baseCardId:card.setId,name:card.name,maxHp:card.hp,hp:card.hp,value:card.val,keywords:card.keywords||[],max:card.max,actions:card.actions,tempAtkBonus:0,tempDefBonus:0,defeated:false,lastHit:false}; }
-function generateEncounter(){ clearEncounter(); let budget=gameState.currentEV,attempts=0; while(budget>0&&gameState.currentEnemies.length<RULES.maxEnemiesOnField&&attempts<100){ attempts++; const opts=ENEMIES.filter((e)=>e.val<=budget&&gameState.currentEnemies.filter((x)=>x.baseCardId===e.setId).length<e.max); if(!opts.length)break; const inst=createEnemyInstance(randomOf(opts)); gameState.currentEnemies.push(inst); budget-=inst.value; attempts=0; } gameState.encounterVal=gameState.currentEnemies.reduce((a,e)=>a+e.value,0); gameState.encounterHadEnemies=gameState.currentEnemies.length>0; gameState.encounterStatus=gameState.encounterHadEnemies?'Player Phase':'No Encounter'; gameState.players.forEach((p)=>p.acted=false); enqueueLog(`Encounter generated. Total VAL ${gameState.encounterVal}/${gameState.currentEV}.`); render(); }
-
-function playerAction(k,i){ const p=gameState.players[i]; if(!p)return;
-if(k==='atk'){ const t=gameState.currentEnemies.find((e)=>e.instanceId===p.selectedTargetId)||gameState.currentEnemies[0]; if(!t){enqueueLog(`${p.name} has no target.`); return;} const dmg=1+p.atk; t.hp-=dmg; hitFeedback(t,'enemy'); enqueueLog(`${p.name} attacks ${t.name} for ${dmg} damage.`); p.acted=true; if(t.hp<=0)defeatEnemy(t); }
-if(k==='def'){ p.defending=!p.defending; enqueueLog(`${p.name} ${p.defending?'is defending':'stops defending'}.`); p.acted=true; }
-if(k==='run'){ enqueueLog(`${p.name} tries to run.`); p.acted=true; }
-if(k==='addInv'){ const it=randomOf(ITEMS); p.inventory.push({...it}); enqueueLog(`${p.name} obtained ${it.name} in inventory.`); }
-if(k==='useItem'){ useSelectedItem(p); p.acted=true; }
-if(k==='addEq'){ const e=randomOf(EQUIPMENT); p.equipment.push({...e}); enqueueLog(`${p.name} equipped ${e.name}.`); p.acted=true; }
-if(k==='addSt'){ const st=randomOf(STATUSES); p.statuses.push({name:st.name,remaining:st.duration}); }
-if(k==='rmSt') p.statuses.pop();
-if(k==='php+') p.hp=Math.min(p.maxHp,p.hp+1); if(k==='php-') p.hp--;
-if(k==='ehp+') gameState.currentEnemies[i].hp++; if(k==='ehp-'){ gameState.currentEnemies[i].hp--; if(gameState.currentEnemies[i].hp<=0) defeatEnemy(gameState.currentEnemies[i]); }
-if(k==='rmEnemy') removeEnemy(gameState.currentEnemies[i],'removed');
-if(k==='assignLoot') assignLoot(i); if(k==='discardLoot') discardLoot(i);
-checkEncounterWon(); maybeAutoResolvePhase(); render(); }
-
-function useSelectedItem(player){ const idx=player.selectedInventoryIndex; const item=player.inventory[idx]; if(!item){ enqueueLog(`${player.name} has no item selected.`); return; }
-const immediate = item.duration===1;
-if(immediate){
-  if(item.text.includes('Recover 4')){ const old=player.hp; player.hp=Math.min(player.maxHp, player.hp+4); enqueueLog(`${player.name} used ${item.name}. HP ${old} -> ${player.hp}.`); }
-  else if(item.text.includes('Remove all status')){ const c=player.statuses.length; player.statuses=[]; enqueueLog(`${player.name} used ${item.name} and removed ${c} statuses.`); }
-  else { enqueueLog(`${player.name} used ${item.name}. Manual resolution may be needed.`); }
-} else {
-  const prev=player.activeItem?.name;
-  player.activeItem={name:item.name,remaining:item.duration,value:item.value,text:item.text};
-  enqueueLog(`${player.name} activated ${item.name} for ${item.duration} rounds.${prev?` Replaced ${prev}.`:''}`);
-}
-player.inventory.splice(idx,1); player.selectedInventoryIndex=Math.max(0,player.selectedInventoryIndex-1);
+function initPlayers(n) {
+  gameState.players = [...Array(n)].map((_, i) => ({
+    id: i + 1,
+    name: `Player ${i + 1}`,
+    maxHp: 20,
+    hp: 20,
+    atk: 1,
+    def: 1,
+    run: 1,
+    selectedMemento: MEMENTOS[0].name,
+    activeItem: null,
+    equipment: [],
+    statuses: [],
+    defending: false,
+    selectedTargetId: null,
+  }));
 }
 
-function maybeAutoResolvePhase(){ if(gameState.encounterWon) return; if(gameState.autoEnemyPhaseAfterPlayerActions && gameState.players.length>0 && gameState.players.every((p)=>p.acted)) resolveEnemyThenEndRound(); }
-function resolveEnemyThenEndRound(){ if(gameState.currentEnemies.length===0||gameState.encounterWon){ enqueueLog('No active enemies. Enemy phase skipped.'); return; } enemyPhase(); if(!gameState.encounterWon) endRound(); }
+function run() {
+  return `<div class='grid'>
+  <section class='panel'><h3>Run Controls</h3>
+    <div class='statline'>Round <b>${gameState.currentRound}</b></div>
+    <div class='statline'>EV: ${gameState.currentEV} <button data-a='ev+'>+</button><button data-a='ev-'>-</button></div>
+    <div class='statline'>Badges: ${gameState.badges} <button data-a='b+'>+</button><button data-a='b-'>-</button></div>
+    <div class='button-row'><button data-a='enc'>Generate Encounter</button><button data-a='enemy'>Enemy Phase</button><button data-a='end'>End Round</button></div>
+    <div class='button-row'><button data-a='loot'>Draw Loot</button><button data-a='warden'>Challenge Warden</button><button data-a='reset'>Reset</button><button data-a='clear'>Clear Encounter</button></div>
+    <p>Encounter VAL: <b>${gameState.encounterVal}</b> | Defeated VAL (Loot): <b>${gameState.defeatedEnemyValue}</b></p>
+  </section>
+  <section class='panel'><h3>Enemy Field (${gameState.currentEnemies.length}/${RULES.maxEnemiesOnField})</h3><div class='card-grid'>${gameState.currentEnemies.map((e,i)=>enemyCard(e,i)).join('') || '<p>No enemies on field.</p>'}</div></section>
+  <section class='panel'><h3>Players</h3><div class='card-grid'>${gameState.players.map((p,i)=>playerCard(p,i)).join('')}</div></section>
+  <section class='panel'><h3>Loot Offers</h3><div class='card-grid compact'>${gameState.lootOffers.map((l,i)=>lootCard(l,i)).join('') || '<p>No loot offered yet.</p>'}</div></section>
+  <section class='panel'><h3>Log</h3><pre>${gameState.activityLog.slice(0,120).join('\n')}</pre><button id='cards'>Cards</button></section>
+  </div>`;
+}
 
-function enemyPhase(){ if(gameState.encounterWon){enqueueLog('Encounter already won. Enemy phase skipped.'); return;} if(gameState.currentEnemies.length===0){enqueueLog('No active enemies. Enemy phase skipped.'); return;} gameState.encounterStatus='Enemy Phase'; for(const e of [...gameState.currentEnemies]){ const d6=r(6); const action=e.actions.find((a)=>a.rolls.includes(d6)); if(!action){enqueueLog(`${e.name} rolled ${d6}... no action.`); continue;} enqueueLog(`${e.name} rolled ${d6}...`); enqueueLog(`${e.name} used ${action.label}.`); resolveEnemyAction(e,action); } gameState.players.forEach((p)=>p.defending=false); enqueueLog('Enemy phase complete.'); checkEncounterWon(); render(); }
-function resolveEnemyAction(enemy,action){ if(action.type==='attackOne'){ const t=gameState.players[Math.floor(Math.random()*gameState.players.length)]; const raw=action.amount+enemy.tempAtkBonus; const def=t.defending?1+t.def:0; const dmg=Math.max(0,raw-def); t.hp-=dmg; hitFeedback(t,'player'); enqueueLog(`${t.name} takes ${dmg} damage.`);} else if(action.type==='attackAll'){ gameState.players.forEach((p)=>{const raw=action.amount+enemy.tempAtkBonus; const def=p.defending?1+p.def:0; const dmg=Math.max(0,raw-def); p.hp-=dmg; hitFeedback(p,'player'); enqueueLog(`${p.name} takes ${dmg} damage.`);}); } else if(action.type==='healSelf'){ enemy.hp=Math.min(enemy.maxHp,enemy.hp+action.amount); enqueueLog(`${enemy.name} heals ${action.amount}.`);} else if(action.type==='buffSelf'){ if(action.stat==='ATK') enemy.tempAtkBonus=Math.min(action.limit||99,enemy.tempAtkBonus+action.amount); if(action.stat==='DEF') enemy.tempDefBonus=Math.min(action.limit||99,enemy.tempDefBonus+action.amount); enqueueLog(`${enemy.name} gains +${action.amount} ${action.stat}.`);} else if(action.type==='giveStatusOne'){ const t=randomOf(gameState.players); t.statuses.push({name:action.status,remaining:5}); enqueueLog(`${t.name} gains ${action.status}.`);} else if(action.type==='giveStatusAll'){ gameState.players.forEach((p)=>p.statuses.push({name:action.status,remaining:5})); enqueueLog(`All players gain ${action.status}.`);} else if(action.type==='spawnSame'){ const template=ENEMIES.find((x)=>x.setId===enemy.baseCardId); const count=gameState.currentEnemies.filter((x)=>x.baseCardId===enemy.baseCardId).length; if(template&&count<template.max&&gameState.currentEnemies.length<RULES.maxEnemiesOnField){const s=createEnemyInstance(template); gameState.currentEnemies.push(s); enqueueLog(`${enemy.name} spawned ${s.name}.`);} } else if(action.type==='flee'){ removeEnemy(enemy,'fled'); } else { enqueueLog('Manual resolution required.'); } }
+function enemyCard(e, i) {
+  return `<article class='proto-card enemy'><header><b>${e.name}</b><span>${e.baseCardId}</span></header>
+  <div class='meta'>KW: ${(e.keywords||[]).join(', ')} | VAL ${e.value} | MAX ${e.max}</div>
+  <div class='bar'>HP ${e.hp}/${e.maxHp} <button data-k='ehp+' data-i='${i}'>+HP</button><button data-k='ehp-' data-i='${i}'>-HP</button><button data-k='rmEnemy' data-i='${i}'>Remove</button></div>
+  <div class='meta'>Temp: +ATK ${e.tempAtkBonus} | +DEF ${e.tempDefBonus} ${e.defending ? '| DEFENDING' : ''} ${e.protected ? '| PROTECTED' : ''}</div>
+  <div class='actions'>${e.actions.map((a)=>`<div class='action-row'><span>${a.rolls.join(',')}</span><span>${a.label}</span></div>`).join('')}</div>
+  </article>`;
+}
 
-function hitFeedback(target,kind){ target.lastHit=true; gameState.shake=true; render(); setTimeout(()=>{ target.lastHit=false; gameState.shake=false; render(); },220); }
-function defeatEnemy(enemy){ gameState.defeatedEnemyValue+=enemy.value; removeEnemy(enemy,'defeated'); }
-function removeEnemy(enemy,reason){ const idx=gameState.currentEnemies.indexOf(enemy); if(idx===-1)return; gameState.currentEnemies.splice(idx,1); gameState.encounterVal=gameState.currentEnemies.reduce((a,e)=>a+e.value,0); enqueueLog(`${enemy.name} ${reason}.${reason==='defeated'?` Defeated VAL +${enemy.value}.`:''}`); checkEncounterWon(); }
+function playerCard(p, i) {
+  const targetOptions = gameState.currentEnemies.map((e) => `<option value='${e.instanceId}' ${e.instanceId===p.selectedTargetId?'selected':''}>${e.name} #${e.instanceId}</option>`).join('');
+  return `<article class='proto-card player'><header><b>${p.name}</b><span>${p.defending ? 'DEFENDING' : 'READY'}</span></header>
+    <div class='bar'>HP ${p.hp}/${p.maxHp} <button data-k='php+' data-i='${i}'>+HP</button><button data-k='php-' data-i='${i}'>-HP</button></div>
+    <div class='meta'>ATK ${p.atk}+${sumStatus(p.statuses,'atkBuff')} | DEF ${p.def}+${sumStatus(p.statuses,'defBuff')} | RUN ${p.run}</div>
+    <div class='meta'>Memento: ${p.selectedMemento}</div>
+    <div class='meta'>Equip: ${p.equipment.map((e)=>`${e.name}(${e.durability})`).join(', ') || 'None'} <button data-k='addEq' data-i='${i}'>+Equip</button></div>
+    <div class='meta'>Item: ${p.activeItem ? `${p.activeItem.name}(${p.activeItem.remaining})` : 'None'} <button data-k='useItem' data-i='${i}'>Use Item</button></div>
+    <div class='meta'>Statuses: ${p.statuses.map((st)=>`${st.name}(${st.remaining})`).join(', ') || 'None'} <button data-k='addSt' data-i='${i}'>+Status</button><button data-k='rmSt' data-i='${i}'>-Status</button></div>
+    <div class='meta'>Target: <select data-k='target' data-i='${i}'>${targetOptions}</select></div>
+    <div class='button-row'><button data-k='atk' data-i='${i}'>Basic Attack</button><button data-k='def' data-i='${i}'>Defend</button></div>
+  </article>`;
+}
 
-function checkEncounterWon(){ if(!gameState.encounterHadEnemies||gameState.currentEnemies.length>0||gameState.encounterWon) return; gameState.encounterWon=true; gameState.encounterStatus='Encounter Won'; enqueueLog('Encounter won!'); drawLoot(true,false); advanceEvAfterWin(); if(gameState.lootOffers.length===0) gameState.encounterStatus='Ready for Next Encounter'; }
-function drawLoot(isAuto=false,force=false){ if(isAuto&&gameState.lootDrawnForEncounter)return; if(!force&&gameState.lootDrawnForEncounter){enqueueLog('Loot already drawn for this encounter.');return;} let rem=gameState.defeatedEnemyValue; gameState.lootOffers=[]; enqueueLog('Drawing loot...'); let tries=0; const pool=[...ITEMS,...EQUIPMENT]; while(rem>0&&tries<80){ tries++; const c=randomOf(pool); const v=c.value||1; if(v>rem){ enqueueLog(`Rejected ${c.name} (${v}) > ${rem}.`); continue; } gameState.lootOffers.push({...c,selectedPlayerIndex:0}); rem-=v; enqueueLog(`Accepted ${c.name} (${v}). Remaining ${rem}.`);} gameState.lootDrawnForEncounter=true; gameState.encounterStatus=gameState.lootOffers.length?'Loot Available':'Ready for Next Encounter'; render(); }
-function advanceEvAfterWin(){ if(gameState.evAdvancedForEncounter)return; const old=gameState.currentEV; gameState.currentEV+=EV_WIN_BONUS; gameState.evAdvancedForEncounter=true; enqueueLog(`EV increased from ${old} to ${gameState.currentEV}.`); }
-function assignLoot(i){ const loot=gameState.lootOffers[i]; if(!loot)return; const p=gameState.players[loot.selectedPlayerIndex||0]; if(!p)return; if(loot.durability)p.equipment.push({...loot}); else p.inventory.push({...loot}); enqueueLog(`Assigned ${loot.name} to ${p.name}.`); gameState.lootOffers.splice(i,1); if(gameState.encounterWon&&gameState.lootOffers.length===0) gameState.encounterStatus='Ready for Next Encounter'; }
-function discardLoot(i){ const loot=gameState.lootOffers[i]; if(!loot)return; enqueueLog(`Discarded ${loot.name}.`); gameState.lootOffers.splice(i,1); if(gameState.encounterWon&&gameState.lootOffers.length===0) gameState.encounterStatus='Ready for Next Encounter'; }
-function endRound(){ gameState.players.forEach((p)=>{ if(p.activeItem){ p.activeItem.remaining--; if(p.activeItem.remaining<=0){ enqueueLog(`${p.name}'s ${p.activeItem.name} expired.`); p.activeItem=null; }} p.statuses.forEach((s)=>s.remaining--); p.statuses=p.statuses.filter((s)=>s.remaining>0); p.defending=false; p.acted=false; }); gameState.currentRound++; gameState.encounterStatus=gameState.encounterWon?'Ready for Next Encounter':'Player Phase'; enqueueLog(`Round ${gameState.currentRound} begins.`); }
+function lootCard(l, i) { return `<article class='proto-card loot'><header><b>${l.name}</b><span>VAL ${l.value || 1}</span></header><div class='meta'>${l.type || 'Item'} | ${l.text || ''}</div><div class='meta'>Assign: ${gameState.players.map((p,idx)=>`<button data-k='assignLoot' data-i='${i}' data-j='${idx}'>P${p.id}</button>`).join(' ')}</div></article>`; }
+function browser() { return `<button id='back'>Back</button><section class='panel'><h3>Enemies</h3><div class='card-grid'>${ENEMIES.map((x)=>`<article class='proto-card enemy'><header><b>${x.name}</b><span>${x.setId}</span></header><div class='meta'>VAL ${x.val} | MAX ${x.max}</div><div class='actions'>${x.actions.map((a)=>`<div class='action-row'><span>${a.rolls.join(',')}</span><span>${a.label}</span></div>`).join('')}</div></article>`).join('')}</div></section>`; }
+
+function bind() { /* same style */
+  if (gameState.screen === 'start') { const pc=document.getElementById('pc'), mem=document.getElementById('mem'); const paint=()=>{mem.innerHTML=[...Array(Number(pc.value))].map((_,i)=>`P${i+1}:<select id='m${i}'>${MEMENTOS.map((m)=>`<option>${m.name}</option>`).join('')}</select><br>`).join('');}; pc.onchange=paint; paint(); document.getElementById('go').onclick=()=>{initPlayers(Number(pc.value)); gameState.players.forEach((p,i)=>p.selectedMemento=document.getElementById(`m${i}`).value); gameState.screen='run'; log('Run started.');}; document.getElementById('browse').onclick=()=>{gameState.screen='browser'; render();}; return; }
+  if (gameState.screen==='browser') { document.getElementById('back').onclick=()=>{gameState.screen='start'; render();}; return; }
+  app.querySelectorAll('button[data-a]').forEach((b)=>b.onclick=()=>actions(b.dataset.a));
+  app.querySelectorAll('button[data-k]').forEach((b)=>b.onclick=()=>playerAction(b.dataset.k, Number(b.dataset.i), Number(b.dataset.j)));
+  app.querySelectorAll("select[data-k='target']").forEach((sel)=>sel.onchange=()=>{gameState.players[Number(sel.dataset.i)].selectedTargetId=Number(sel.value);});
+  document.getElementById('cards').onclick=()=>{gameState.screen='browser'; render();};
+}
+
+function actions(a){ if(a==='enc')generateEncounter(); if(a==='enemy')enemyPhase(); if(a==='end')endRound(); if(a==='loot')drawLoot(); if(a==='warden')challengeWarden(); if(a==='reset')location.reload(); if(a==='clear'){gameState.currentEnemies=[]; gameState.encounterVal=0; log('Encounter cleared.');} if(a==='ev+')gameState.currentEV++; if(a==='ev-')gameState.currentEV=Math.max(1,gameState.currentEV-1); if(a==='b+')gameState.badges++; if(a==='b-')gameState.badges=Math.max(0,gameState.badges-1); render(); }
+
+function createEnemyInstance(card){ return {instanceId: gameState.enemyInstanceSeq++, baseCardId: card.setId, name: card.name, maxHp: card.hp, hp: card.hp, value: card.val, keywords: card.keywords||[], max: card.max, actions: card.actions, tempAtkBonus:0, tempDefBonus:0, defending:false, protected:false, defeated:false}; }
+function generateEncounter(){ gameState.currentEnemies=[]; gameState.defeatedEnemyValue=0; gameState.lootOffers=[]; let budget=gameState.currentEV; let attempts=0; while(budget>0 && gameState.currentEnemies.length<RULES.maxEnemiesOnField && attempts<100){ attempts++; const opts=ENEMIES.filter((e)=>e.val<=budget && gameState.currentEnemies.filter((x)=>x.baseCardId===e.setId).length<e.max); if(!opts.length) break; const card=randomOf(opts); const inst=createEnemyInstance(card); gameState.currentEnemies.push(inst); budget-=inst.value; attempts=0; }
+  gameState.encounterVal=gameState.currentEnemies.reduce((a,e)=>a+e.value,0); log(`Encounter generated: ${gameState.currentEnemies.map((e)=>`${e.name}#${e.instanceId}`).join(', ')||'none'} | Total VAL ${gameState.encounterVal}/${gameState.currentEV}.`);
+}
+
+function playerAction(k,i,j){ const p=gameState.players[i]; if(!p)return; if(k==='atk'){ const targetEnemy=gameState.currentEnemies.find((e)=>e.instanceId===p.selectedTargetId) || gameState.currentEnemies[0]; if(!targetEnemy){log(`${p.name} tried to attack but no target exists.`); return;} const dmg=1+p.atk+sumStatus(p.statuses,'atkBuff'); targetEnemy.hp-=dmg; log(`${p.name} basic attack dealt ${dmg} to ${targetEnemy.name}#${targetEnemy.instanceId}. HP ${targetEnemy.hp}/${targetEnemy.maxHp}.`); if(targetEnemy.hp<=0)defeatEnemy(targetEnemy);} if(k==='def'){p.defending=!p.defending; log(`${p.name} defend ${p.defending?'enabled':'disabled'}.`);} if(k==='addSt'){const st=randomOf(STATUSES); p.statuses.push({name:st.name,remaining:st.duration,atkBuff:0,defBuff:0});} if(k==='rmSt')p.statuses.pop(); if(k==='php+')p.hp=Math.min(p.maxHp,p.hp+1); if(k==='php-')p.hp--; if(k==='ehp+')gameState.currentEnemies[i].hp++; if(k==='ehp-'){gameState.currentEnemies[i].hp--; if(gameState.currentEnemies[i].hp<=0)defeatEnemy(gameState.currentEnemies[i]);} if(k==='rmEnemy'){removeEnemy(gameState.currentEnemies[i],'removed');} if(k==='useItem'){const it=randomOf(ITEMS); p.activeItem={name:it.name,remaining:it.duration,value:it.value};} if(k==='addEq'){const e=randomOf(EQUIPMENT); p.equipment.push({...e});} if(k==='assignLoot')assignLoot(i,j); render(); }
+
+function targetPlayer(){ if(gameState.players.length===1)return {roll:1,player:gameState.players[0]}; let roll=r(4); if(gameState.players.length===3 && roll===4 && RULES.threePlayerTargetRule==='reroll4') roll=r(3); return {roll,player:gameState.players[Math.min(roll,gameState.players.length)-1]}; }
+function addStatus(player,name){ const st=STATUSES.find((x)=>x.name.toLowerCase()===name.toLowerCase()); if(st) player.statuses.push({name:st.name,remaining:st.duration,atkBuff:0,defBuff:0}); }
+
+function enemyPhase(){ const acting=[...gameState.currentEnemies]; for (const enemy of acting){ if(enemy.defeated) continue; const d6=r(6); const action=enemy.actions.find((a)=>a.rolls.includes(d6)); if(!action){log(`${enemy.name} d6=${d6}: no action.`); continue;} log(`${enemy.name} d6=${d6} -> ${action.label}`); resolveEnemyAction(enemy,action); }
+  gameState.players.forEach((p)=>p.defending=false); log('Enemy phase complete. Defend states cleared.'); }
+
+function resolveEnemyAction(enemy, action){ switch(action.type){ case 'none': break; case 'attackOne': { const t=targetPlayer(); const raw=action.amount + enemy.tempAtkBonus; const defend=t.player.defending ? 1 + t.player.def + sumStatus(t.player.statuses,'defBuff') : 0; const dmg=Math.max(0,raw-defend); t.player.hp-=dmg; log(`${enemy.name} hits ${t.player.name} for ${dmg} (${raw}-${defend}).`); break; } case 'attackAll': gameState.players.forEach((p)=>{ const raw=action.amount + enemy.tempAtkBonus; const defend=p.defending ? 1 + p.def + sumStatus(p.statuses,'defBuff') : 0; const dmg=Math.max(0,raw-defend); p.hp-=dmg; log(`${enemy.name} hits ${p.name} for ${dmg} (${raw}-${defend}).`);}); break; case 'giveStatusOne': { const t=targetPlayer(); addStatus(t.player, action.status); log(`${t.player.name} gains status ${action.status}.`); break; } case 'giveStatusAll': gameState.players.forEach((p)=>addStatus(p, action.status)); log(`All players gain status ${action.status}.`); break; case 'healSelf': enemy.hp=Math.min(enemy.maxHp, enemy.hp+action.amount); log(`${enemy.name} healed to ${enemy.hp}/${enemy.maxHp}.`); break; case 'buffSelf': if(action.stat==='ATK') enemy.tempAtkBonus=Math.min(action.limit ?? 99, enemy.tempAtkBonus + action.amount); if(action.stat==='DEF') enemy.tempDefBonus=Math.min(action.limit ?? 99, enemy.tempDefBonus + action.amount); log(`${enemy.name} buffed ${action.stat}.`); break; case 'spawnSame': { const template=ENEMIES.find((x)=>x.setId===enemy.baseCardId); const countSame=gameState.currentEnemies.filter((x)=>x.baseCardId===enemy.baseCardId).length; if(template && gameState.currentEnemies.length<RULES.maxEnemiesOnField && countSame<template.max){ const spawned=createEnemyInstance(template); gameState.currentEnemies.push(spawned); gameState.encounterVal += spawned.value; log(`${enemy.name} spawned ${spawned.name}#${spawned.instanceId}.`);} else log(`${enemy.name} spawn failed (max reached).`); break; } case 'flee': removeEnemy(enemy,'fled'); break; default: log('Manual resolution required.'); }}
+
+function defeatEnemy(enemy){ enemy.defeated=true; gameState.defeatedEnemyValue += enemy.value; removeEnemy(enemy,'defeated'); }
+function removeEnemy(enemy, reason){ const idx=gameState.currentEnemies.indexOf(enemy); if(idx===-1)return; gameState.currentEnemies.splice(idx,1); gameState.encounterVal=gameState.currentEnemies.reduce((a,e)=>a+e.value,0); log(`${enemy.name} ${reason}.${reason==='defeated'?` Defeated VAL +${enemy.value}.`:''}`); }
+function endRound(){ gameState.players.forEach((p)=>{ if(p.activeItem){ p.activeItem.remaining--; if(p.activeItem.remaining<=0){ log(`${p.name} item expired: ${p.activeItem.name}`); p.activeItem=null; }} p.statuses.forEach((st)=>st.remaining--); p.statuses=p.statuses.filter((st)=>st.remaining>0); p.defending=false;}); gameState.currentRound++; log(`Round ended. Now starting round ${gameState.currentRound}.`); }
+function drawLoot(){ let rem=gameState.defeatedEnemyValue; const pool=[...ITEMS,...EQUIPMENT]; gameState.lootOffers=[]; let tries=0; while(rem>0 && tries<80){ tries++; const c=randomOf(pool); const v=c.value||1; if(v>rem){ log(`Loot rejected ${c.name} (VAL ${v}) > remaining ${rem}.`); continue;} gameState.lootOffers.push(c); rem-=v; log(`Loot accepted ${c.name} (VAL ${v}), remaining budget ${rem}.`);} log(`Loot draw complete: budget ${gameState.defeatedEnemyValue}, offered ${gameState.lootOffers.length}.`); }
+function assignLoot(lootIdx,playerIdx){ const loot=gameState.lootOffers[lootIdx], p=gameState.players[playerIdx]; if(!loot||!p)return; if(loot.durability)p.equipment.push({...loot}); else p.activeItem={name:loot.name,remaining:loot.duration||1,value:loot.value}; gameState.lootOffers.splice(lootIdx,1); log(`Assigned loot ${loot.name} to ${p.name}.`); }
+function challengeWarden(){ const w=WARDENS[0]; if(gameState.currentEV<w.evReq || gameState.badges<w.badgeReq) return log(`Warden locked: needs EV ${w.evReq} and badges ${w.badgeReq}.`); gameState.currentEnemies=[createEnemyInstance({...w, actions:[{rolls:[1,2,3,4,5,6],label:'Manual',type:'manual'}]})]; gameState.encounterVal=w.val; log(`Challenged Warden ${w.name}.`); }
 
 render();
